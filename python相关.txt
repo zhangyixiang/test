@@ -1,0 +1,35 @@
+创建虚拟环境:windows版
+1.进入项目目录下，使用 Python 自带的 venv 模块来创建一个虚拟环境
+python -m venv .venv
+2.激活虚拟环境（每次你在这个环境中安装一个 新的包 时，都需要 重新激活 这个环境）
+.venv\Scripts\Activate.ps1   powershell
+3.检查虚拟环境是否激活
+Get-Command python
+4.升级 pip
+python -m pip install --upgrade pip
+5.添加 .gitignore
+echo "*" > .venv/.gitignore
+6.安装软件包
+	6.1.直接安装包
+	pip install "fastapi[standard]"
+	6.2.从 requirements.txt 安装
+	pip install -r requirements.txt
+7.退出虚拟环境
+deactivate
+
+
+项目启动及依赖加载：
+uv sync   自动读取 pyproject.toml文件，搭建虚拟环境，且安装好所有依赖
+执行命令方式：
+1.
+.venv\Scripts\Activate.ps1  激活虚拟环境
+python hello.py  执行命令
+2.
+uv run main.py  不需要激活环境直接执行
+
+python -m py_compile app/services/images/spu_sku_image_service.py
+
+
+FastAPI框架
+1.安装 FastAPI
+pip install "fastapi[standard]"

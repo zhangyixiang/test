@@ -1,0 +1,281 @@
+RabbitMQ 是一个开源的消息代理和队列服务器，用来实现应用程序之间的异步通信。
+1.1 核心组件
+Producer（生产者）: 发送消息的应用程序
+Consumer（消费者）: 接收消息的应用程序
+Queue（队列）: 存储消息的缓冲区
+Exchange（交换机）: 接收生产者发送的消息并推送到队列中
+Binding（绑定）: 队列和交换机之间的关联
+
+Producer → Exchange → Binding → Queue → Consumer
+
+
+简单队列: 一对一消息传递
+# 生产者
+def producer():
+    # 建立连接
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明队列
+    channel.queue_declare(queue='hello')
+    
+    # 发送消息
+    message = {'task_id': 123, 'data': 'Hello World!'}
+    channel.basic_publish(
+        exchange='',
+        routing_key='hello',
+        body=json.dumps(message)
+    )
+    
+    print(" [x] Sent message")
+    connection.close()
+
+# 消费者
+def consumer():
+    def callback(ch, method, properties, body):
+        message = json.loads(body)
+        print(f" [x] Received {message}")
+        # 处理完成后手动确认
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明队列
+    channel.queue_declare(queue='hello')
+    
+    # 设置每次只处理一条消息
+    channel.basic_qos(prefetch_count=1)
+    
+    # 绑定回调函数
+    channel.basic_consume(queue='hello', on_message_callback=callback)
+    
+    print(' [*] Waiting for messages. To exit press CTRL+C')
+    channel.start_consuming()
+	
+	
+工作队列: 负载均衡的消息处理
+# 生产者 - 发送任务
+def send_task():
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明持久化队列
+    channel.queue_declare(queue='task_queue', durable=True)
+    
+    # 发送多个任务
+    for i in range(5):
+        message = {
+            'task_id': i,
+            'workload': '.' * (i + 1)  # 模拟不同工作量
+        }
+        
+        channel.basic_publish(
+            exchange='',
+            routing_key='task_queue',
+            body=json.dumps(message),
+            properties=pika.BasicProperties(
+                delivery_mode=2,  # 消息持久化
+            )
+        )
+        print(f" [x] Sent task {i}")
+    
+    connection.close()
+
+# 消费者 - 处理任务
+def worker():
+    def callback(ch, method, properties, body):
+        message = json.loads(body)
+        print(f" [x] Processing task {message['task_id']}")
+        
+        # 模拟工作处理时间
+        time.sleep(len(message['workload']))
+        
+        print(f" [x] Task {message['task_id']} completed")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明持久化队列
+    channel.queue_declare(queue='task_queue', durable=True)
+    
+    # 公平分发
+    channel.basic_qos(prefetch_count=1)
+    
+    channel.basic_consume(queue='task_queue', on_message_callback=callback)
+    
+    print(' [*] Waiting for tasks. To exit press CTRL+C')
+    channel.start_consuming()
+	
+	
+发布/订阅: 一对多消息广播
+# 生产者
+def emit_log(message):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明fanout交换机
+    channel.exchange_declare(exchange='logs', exchange_type='fanout')
+    
+    # 发送消息到交换机
+    channel.basic_publish(
+        exchange='logs',
+        routing_key='',  # fanout模式忽略routing_key
+        body=message
+    )
+    
+    print(f" [x] Sent {message}")
+    connection.close()
+
+# 消费者
+def receive_logs():
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明交换机
+    channel.exchange_declare(exchange='logs', exchange_type='fanout')
+    
+    # 创建临时队列
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+    
+    # 绑定队列到交换机
+    channel.queue_bind(exchange='logs', queue=queue_name)
+    
+    def callback(ch, method, properties, body):
+        print(f" [x] {body}")
+    
+    channel.basic_consume(
+        queue=queue_name, 
+        on_message_callback=callback, 
+        auto_ack=True
+    )
+    
+    print(' [*] Waiting for logs. To exit press CTRL+C')
+    channel.start_consuming()
+
+路由模式: 基于路由键的消息分发
+# 生产者
+def emit_log_direct(severity, message):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明direct交换机
+    channel.exchange_declare(exchange='direct_logs', exchange_type='direct')
+    
+    # 根据severity发送消息
+    channel.basic_publish(
+        exchange='direct_logs',
+        routing_key=severity,
+        body=message
+    )
+    
+    print(f" [x] Sent {severity}:{message}")
+    connection.close()
+
+# 消费者
+def receive_logs_direct(severities):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    channel.exchange_declare(exchange='direct_logs', exchange_type='direct')
+    
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+    
+    # 绑定多个routing_key
+    for severity in severities:
+        channel.queue_bind(
+            exchange='direct_logs', 
+            queue=queue_name, 
+            routing_key=severity
+        )
+    
+    def callback(ch, method, properties, body):
+        print(f" [x] {method.routing_key}:{body}")
+    
+    channel.basic_consume(
+        queue=queue_name, 
+        on_message_callback=callback, 
+        auto_ack=True
+    )
+    
+    print(' [*] Waiting for logs. To exit press CTRL+C')
+    channel.start_consuming()
+
+# 使用示例
+# receive_logs_direct(['info', 'warning', 'error'])
+
+
+主题模式: 基于模式匹配的消息分发
+# 生产者
+def emit_log_topic(routing_key, message):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    # 声明topic交换机
+    channel.exchange_declare(exchange='topic_logs', exchange_type='topic')
+    
+    channel.basic_publish(
+        exchange='topic_logs',
+        routing_key=routing_key,
+        body=message
+    )
+    
+    print(f" [x] Sent {routing_key}:{message}")
+    connection.close()
+
+# 消费者
+def receive_logs_topic(binding_keys):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    
+    channel.exchange_declare(exchange='topic_logs', exchange_type='topic')
+    
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+    
+    # 绑定多个模式
+    for binding_key in binding_keys:
+        channel.queue_bind(
+            exchange='topic_logs', 
+            queue=queue_name, 
+            routing_key=binding_key
+        )
+    
+    def callback(ch, method, properties, body):
+        print(f" [x] {method.routing_key}:{body}")
+    
+    channel.basic_consume(
+        queue=queue_name, 
+        on_message_callback=callback, 
+        auto_ack=True
+    )
+    
+    print(' [*] Waiting for logs. To exit press CTRL+C')
+    channel.start_consuming()
+
+# 使用示例
+# receive_logs_topic(['*.rabbit', 'lazy.#'])
+
+
+C:\Users\dell>rabbitmq-plugins l
+'rabbitmq-plugins' is not recogn
+operable program or batch file.
+
+rabbitmq-plugins 
+
+RABBITQM_SERVER
+
+Please either set ERLANG_HOME to point to your Erlang installation or place the
+RabbitMQ server distribution in the Erlang lib folder.
+
+ERLANG_HOME
+D:\ruanjian\erlang\Erlang OTP
+
+rabbitmq安装路径：D:\ruanjian\rabitmq   
+报错：
+C:\Users\dell>rabbitmq-plugins list
+'rabbitmq-plugins' is not recognized as an internal or external command,
+operable program or batch file.

@@ -1,0 +1,58 @@
+第一阶段：构建环境（builder）
+FROM php:8.2-cli AS builder
+使用 php:8.2-cli 作为构建阶段的基础镜像。注意这里用的是 cli 版本而不是 apache 版本，因为构建阶段只需要执行 PHP 命令行工具，不需要 Web 服务器。AS builder 给这个阶段起了一个别名，方便后面引用。
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+从官方 Composer 镜像中复制 Composer 可执行文件。
+RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/*
+安装 unzip（Composer 解压依赖包需要用到），然后清理缓存。注意这里没装 git，说明项目的依赖都是通过 Packagist 发布的标准包，不需要从 Git 仓库拉取。
+WORKDIR /app
+设置工作目录为 /app。
+COPY composer.json ./ → RUN composer install ...
+先只复制 composer.json，执行依赖安装。这样利用 Docker 缓存，只要 composer.json 不变，依赖就不会重新安装。--no-interaction 参数表示不需要任何交互式确认，适合 CI/CD 环境。
+COPY . .
+最后才复制全部项目代码。
+
+第二阶段：运行环境（runtime）
+FROM php:8.2-apache AS runtime
+使用 php:8.2-apache 作为运行阶段的基础镜像，内置 Apache 服务器，可以直接对外提供 Web 服务。
+WORKDIR /var/www/html
+设置工作目录为 Apache 的默认网站根目录。
+COPY --from=builder /app/vendor ./vendor
+COPY --from=builder /app/index.php ./
+COPY --from=builder /app/src ./src
+这是多阶段构建的核心所在——只从 builder 阶段中挑选运行时需要的文件复制过来：
+
+vendor/ — Composer 安装的依赖
+index.php — 入口文件
+src/ — 业务代码
+
+构建阶段的 Composer 本身、unzip、apt 缓存、composer.json 等构建工具和配置文件全部丢弃，不会出现在最终镜像中。
+EXPOSE 80
+声明容器监听 80 端口（Apache 默认端口），方便外部映射。
+
+
+
+
+整体流程示意
+┌─────────────────────────────┐
+│  第一阶段 (builder)          │
+│  php:8.2-cli                │
+│                             │
+│  Composer + unzip           │
+│  composer install           │
+│  生成 vendor/               │
+│  复制项目代码                │
+└──────────┬──────────────────┘
+           │ 只复制需要的文件
+           ↓
+┌─────────────────────────────┐
+│  第二阶段 (runtime)          │
+│  php:8.2-apache             │
+│                             │
+│  vendor/  (依赖)            │
+│  index.php (入口)           │
+│  src/     (业务代码)         │
+│                             │
+│  EXPOSE 80                  │
+│  最终产出的精简镜像           │
+└─────────────────────────────┘

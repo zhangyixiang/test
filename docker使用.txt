@@ -1,0 +1,349 @@
+参考文档:https://yeasy.gitbook.io/docker_practice/network/port_mapping
+常用基础命令：
+docker run：这是最常用的命令，用于运行一个新的容器。例如，docker run ubuntu会运行一个新的Ubuntu容器。
+
+docker start：启动一个或多个已经被停止的容器。例如，docker start my_container会启动名为my_container的容器。
+
+docker stop：停止一个或多个正在运行的容器。例如，docker stop my_container会停止名为my_container的容器。
+
+docker build：用于从Dockerfile创建镜像。例如，docker build -t my_image .会使用当前目录下的Dockerfile创建一个名为my_image的镜像。
+
+docker pull：从远程获取镜像。例如，docker pull ubuntu会从Docker Hub获取Ubuntu镜像。
+
+docker push：将镜像推送到远程。例如，docker push my_image会将名为my_image的镜像推送到Docker Hub。
+
+docker rm：删除一个或多个容器。例如，docker rm my_container会删除名为my_container的容器。
+
+docker rmi：删除一个或多个镜像。例如，docker rmi my_image会删除名为my_image的镜像。
+
+docker ps：列出当前正在运行的容器。docker ps -a会列出所有的容器，包括已经停止的。
+
+docker images：列出本地的所有镜像。
+
+docker exec：在运行的容器中执行命令。例如，docker exec my_container ls会在名为my_container的容器中执行ls命令。
+进入指定容器 docker exec -it 容器名 bash
+
+docker -it 的组合通常用于启动一个新的 Docker 容器，并且直接进入这个容器的交互式终端。例如，docker run -it ubuntu /bin/bash 这个命令会启动一个新的 Ubuntu 容器，并且打开一个 bash shell，你可以在这个 shell 里面直接运行命令
+
+导出容器 docker export  导入容器  docker import
+
+
+容器数据卷语法：
+容器数据卷特征
+        数据卷是一个可供一个或多个容器使用的特殊目录，它将主机操作系统目录直接映射进容器 （也就是数据卷可以把数据可以直接映射到容器中）
+
+        数据卷的特性：
+                1.数据卷 可以在容器之间共享和重用
+                2.对数据卷的修改会立马生效
+                3.对数据卷的更新，不会影响镜像
+                4.数据卷 默认会一直存在，即使容器被删除
+				原文链接：https://blog.csdn.net/gongdiwudu/article/details/128756465
+创建一个数据卷  docker volume create my-vol
+查看所有的数据卷  docker volume ls
+查看指定数据卷的信息  docker volume inspect my-vol(数据卷名)
+查看数据卷的具体信息 docker inspect web（容器名）
+删除数据卷 docker volume rm my-vol
+
+数据卷映射(宿主机和容器间修改相互生效) 宿主机目录 以及容器目录 不需要预先建立，如无，run指令会自动建立
+docker run -v  [宿主机路径]:[容器内路径]   [image]
+docker run --name scf_spark -v D:\phpstudy_pro\WWW\istore_new\Backend:/istore/Backend -p 127.0.0.1:9501:9501 -it registry.cn-hangzhou.aliyuncs.com/suntekyyds/hyperf_img:latest
+
+通过-mount挂载数据卷（挂载一个主机目录作为数据卷）
+使用 --mount 标记可以指定挂载一个本地主机的目录到容器中去，在使用 --mount 参数时如果本地目录不存在，Docker 会报错，Docker 挂载主机目录的默认权限是 读写，用户也可以通过增加 readonly 指定为 只读，故，若使用该方式需先创建数据卷
+docker volume create  mysql_data & docker volume create mysql_conf & docker volume create mysql_log
+$ docker run -d -P \
+    --name web \
+    # -v /src/webapp:/usr/share/nginx/html:ro \
+    --mount type=bind,source=/src/webapp,target=/usr/share/nginx/html,readonly \
+    nginx:alpine
+加了 readonly 之后，就挂载为 只读 了。如果你在容器内 /usr/share/nginx/html 目录新建文件，会显示如下错误
+
+--mount要点
+由多个键值对组成，以逗号分隔，每个键值对由一个 <key>=<value> 元组组成。 --mount 语法比 -v 或 --volume 更冗长，但键的顺序并不重要，标志的值更容易理解。
+挂载类型 type，可以是 bind、volume 或 tmpfs。本主题讨论卷，因此类型始终是卷。
+	（1）volumes：Docker管理宿主机文件系统的一部分，默认位于 /var/lib/docker/volumes 目录中；（最常用的方式）
+	（2）bind mounts：意为着可以存储在宿主机系统的任意位置；（比较常用的方式）
+　　	但是，bind mount在不同的宿主机系统时不可移植的，比如Windows和Linux的目录结构是不一样的，bind mount所指向的host目录也不能一样。这也是为什么bind mount不能出现在Dockerfile中的原因，因为这样Dockerfile就不可移植了。
+　　（3）tmpfs：挂载存储在宿主机系统的内存中，而不会写入宿主机的文件系统；（一般都不会用的方式）
+mount的来源。对于命名卷，这是卷的名称。对于匿名卷，省略此字段。可以指定为 source 或 src。
+destination 将文件或目录挂载在容器中的路径作为其值。可以指定为目的地、dst 或目标。
+readonly 选项（如果存在）会使绑定挂载以只读方式挂载到容器中。可以指定为只读或 ro。
+可以多次指定的 volume-opt 选项采用由选项名称及其值组成的键值对。
+
+-v 或 --mount 标志区别
+-mount可以支持创建集群服务的数据卷，而-v不行
+
+
+外部访问容器
+指定要映射的端口，并且，在一个指定端口上只可以绑定一个容器
+映射所有接口地址
+使用 hostPort:containerPort 格式本地的 80 端口映射到容器的 80 端口  docker run -d -p 80:80 nginx:alpine
+
+映射到指定地址的指定端口 可以使用 ip:hostPort:containerPort 格式指定映射使用一个特定地址，比如 localhost 地址 127.0.0.1  docker run -d -p 127.0.0.1:80:80
+使用 ip::containerPort 绑定 localhost 的任意端口到容器的 80 端口，本地主机会自动分配一个端口。  docker run -d -p 127.0.0.1::80 nginx:alpine
+还可以使用 udp 标记来指定 udp 端口   docker run -d -p 127.0.0.1:80:80/udp nginx:alpine
+查看映射端口配置  docker port 容器名  
+	容器有自己的内部网络和 ip 地址（使用 docker inspect 查看，Docker 还可以有一个可变的网络配置。）
+	-p 标记可以多次使用来绑定多个端口  docker run -d \ -p 80:80 \ -p 443:443 \ nginx:alpine
+	
+查看访问记录  docker logs 容器名
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+docker部署参考：
+一、部署前的准备 1. 环境要求 • 服务器 / 本地电脑已安装 Docker（Windows/macOS/Linux 均可），验证方式： bash   运行      docker --version  # 查看版本，有输出则安装成功
+docker ps         # 查看运行中的容器，无报错则 Docker 服务正常
+     • 若未安装，以 Linux（CentOS/Ubuntu）为例，快速安装命令： bash   运行      # CentOS
+yum install -y docker-ce docker-ce-cli containerd.io
+systemctl start docker
+systemctl enable docker
+
+# Ubuntu
+apt update && apt install -y docker.io
+systemctl start docker
+systemctl enable docker
+      2. 准备镜像（两种方式） • 方式 1：从 Docker Hub 拉取公共镜像（比如部署 Nginx 示例）： bash   运行      docker pull nginx:latest  # 拉取最新版 Nginx 镜像
+     • 方式 2：使用本地构建的镜像（比如自己写 Dockerfile 构建的镜像）：先确认本地有镜像： bash   运行      docker images  # 列出本地所有镜像，能看到镜像名、标签、ID
+      二、核心部署步骤（以 Nginx 为例） 步骤 1：运行容器（最基础的部署） 执行以下命令，将 Nginx 镜像运行成容器，同时映射端口（让外部能访问）： bash   运行      docker run -d --name my-nginx -p 80:80 nginx:latest
+    命令解释： • -d：后台运行容器（守护进程模式），不会占用终端； • --name my-nginx：给容器命名（自定义，方便管理）； • -p 80:80：端口映射，格式 主机端口:容器端口，把主机的 80 端口映射到容器内的 80 端口； • nginx:latest：要运行的镜像名 + 标签。  步骤 2：验证部署是否成功 • 查看容器状态： bash   运行      docker ps  # 若能看到 my-nginx 容器，状态为 Up，则运行成功
+     • 访问服务： ◦ 本地部署：浏览器打开 http://localhost，能看到 Nginx 欢迎页则成功； ◦ 服务器部署：浏览器打开 http://服务器IP，能看到欢迎页则成功。    步骤 3：进阶部署（挂载目录，持久化配置 / 数据） 基础部署的容器内数据（比如 Nginx 配置、网页文件）重启后会丢失，所以实际部署需挂载主机目录到容器： bash   运行      # 1. 先在主机创建目录（存放 Nginx 配置和网页文件）
+mkdir -p /docker/nginx/conf /docker/nginx/html
+
+# 2. 复制容器内默认配置到主机（方便修改）
+docker cp my-nginx:/etc/nginx/nginx.conf /docker/nginx/conf/
+docker cp my-nginx:/usr/share/nginx/html/index.html /docker/nginx/html/
+
+# 3. 停止并删除原容器（重新运行带挂载的容器）
+docker stop my-nginx
+docker rm my-nginx
+
+# 4. 重新运行容器，挂载目录
+docker run -d --name my-nginx \
+  -p 80:80 \
+  -v /docker/nginx/conf/nginx.conf:/etc/nginx/nginx.conf \  # 挂载配置文件
+  -v /docker/nginx/html:/usr/share/nginx/html \              # 挂载网页目录
+  --restart=always \                                         # 容器异常退出时自动重启
+  nginx:latest
+    关键参数解释： • -v 主机目录:容器目录：将主机的目录挂载到容器内，实现数据持久化； • --restart=always：保障容器稳定性，Docker 重启 / 服务器重启后，容器自动启动。  三、部署后的常用管理操作 bash   运行      # 查看容器日志（排查问题）
+docker logs my-nginx
+
+# 进入容器内部操作（比如修改临时配置）
+docker exec -it my-nginx /bin/bash
+
+# 重启/停止/启动容器
+docker restart my-nginx
+docker stop my-nginx
+docker start my-nginx
+
+# 删除容器（需先停止）
+docker stop my-nginx && docker rm my-nginx
+
+# 删除镜像（需先删除依赖该镜像的容器）
+docker rmi nginx:latest
+    四、实际项目部署注意事项 1. 端口冲突：部署前先检查主机端口是否被占用（netstat -tulpn | grep 80），避免 -p 参数的主机端口冲突； 2. 权限问题：挂载目录时，需确保主机目录权限足够（比如 chmod 755 /docker/nginx），否则容器可能无法读写； 3. 镜像版本：避免用 latest 标签（易更新导致兼容问题），建议指定具体版本（如 nginx:1.25.3）； 4. 多容器部署：若需部署多个关联服务（比如 Nginx + PHP + MySQL），建议用 docker-compose 替代手动 docker run，配置更清晰。  总结 1. Docker 镜像部署核心是 docker run 命令，通过 -p 映射端口、-v 挂载目录实现基础部署； 2. 实际生产中，务必加 --restart=always 保障容器稳定性，并用目录挂载实现数据持久化； 3. 验证部署的关键是「查看容器状态」+「访问服务端口」，排查问题优先看容器日志。  如果是部署特定应用（比如 PHP 项目、Java 项目），可以告诉我具体场景，我会给你针对性的 Docker 部署命令和配置文件。
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+
+多容器部署：
+一、部署前准备 1. 环境要求 • 服务器已安装 Docker + Docker Compose（验证命令）： bash   运行      docker --version
+docker-compose --version  # 无输出则需安装：yum install docker-compose -y / apt install docker-compose -y
+      • 本地 / 服务器已有 Hyperf 项目代码（假设项目目录为 /www/hyperf-project）。  2. 项目目录结构（建议） 先把 Hyperf 项目整理成如下结构，方便挂载和管理： plaintext        /www/hyperf-project/          # Hyperf 项目根目录
+├── docker-compose.yml        # 核心配置文件（下文会提供）
+├── nginx/                    # Nginx 配置目录
+│   └── conf.d/
+│       └── hyperf.conf       # Nginx 反向代理配置
+├── mysql/                    # MySQL 数据持久化目录
+├── redis/                    # Redis 数据持久化目录
+├── .env                      # 环境变量（可选，存放数据库/Redis 密码）
+└── hyperf/                   # Hyperf 项目代码（你的业务代码）
+    ├── app/
+    ├── config/
+    ├── composer.json
+    └── ...
+    二、核心配置文件编写 1. docker-compose.yml（核心，管理所有容器） 创建 /www/hyperf-project/docker-compose.yml，内容如下（注释已写清楚）： yaml        version: '3.8'  # Compose 文件版本，兼容主流 Docker 版本
+
+services:
+  # 1. Nginx 容器（反向代理 Hyperf）
+  nginx:
+    image: nginx:1.25.3  # 指定版本，避免 latest 兼容问题
+    container_name: hyperf-nginx
+    ports:
+      - "80:80"  # 主机80端口映射到容器80
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d  # 挂载 Nginx 配置
+      - ./hyperf/public:/var/www/html/public  # 挂载 Hyperf 静态资源（如有）
+    depends_on:
+      - hyperf  # 先启动 hyperf 再启动 nginx
+    restart: always  # 异常自动重启
+    networks:
+      - hyperf-network  # 加入自定义网络，方便容器互通
+
+  # 2. Hyperf 容器（PHP 服务）
+  hyperf:
+    # 推荐用官方 Hyperf 镜像，已预装 PHP/扩展/Swoole
+    image: hyperf/hyperf:8.1-alpine-v3.18-swoole5.1
+    container_name: hyperf-app
+    working_dir: /var/www/html  # 容器内工作目录
+    volumes:
+      - ./hyperf:/var/www/html  # 挂载本地 Hyperf 代码到容器
+      - ./hyperf/.env:/var/www/html/.env  # 挂载环境变量文件
+    command: "php bin/hyperf.php start"  # 启动 Hyperf 服务
+    depends_on:
+      - mysql
+      - redis
+    restart: always
+    networks:
+      - hyperf-network
+    # 如需调试，可暴露 9501 端口（Hyperf 默认端口）
+    # ports:
+    #   - "9501:9501"
+
+  # 3. MySQL 容器
+  mysql:
+    image: mysql:8.0  # MySQL 8.0 版本
+    container_name: hyperf-mysql
+    ports:
+      - "3306:3306"  # 主机3306映射到容器3306（可选，本地调试用）
+    volumes:
+      - ./mysql:/var/lib/mysql  # 挂载数据目录，持久化 MySQL 数据
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql  # 初始化 SQL（可选）
+    environment:
+      # 数据库基础配置，建议放到 .env 文件，这里先写死方便测试
+      MYSQL_ROOT_PASSWORD: "123456"  # root 密码
+      MYSQL_DATABASE: "hyperf_db"    # 自动创建的数据库名
+      MYSQL_USER: "hyperf_user"      # 自定义用户
+      MYSQL_PASSWORD: "123456"       # 自定义用户密码
+      MYSQL_CHARACTER_SET_SERVER: "utf8mb4"
+      MYSQL_COLLATION_SERVER: "utf8mb4_unicode_ci"
+    restart: always
+    networks:
+      - hyperf-network
+    # MySQL 8.0 认证插件兼容（避免 Hyperf 连接报错）
+    command: --default-authentication-plugin=mysql_native_password
+
+  # 4. Redis 容器
+  redis:
+    image: redis:7.0  # Redis 7.0 版本
+    container_name: hyperf-redis
+    ports:
+      - "6379:6379"  # 主机6379映射到容器6379
+    volumes:
+      - ./redis:/data  # 挂载数据目录，持久化 Redis 数据
+    command: "redis-server --requirepass 123456"  # 设置 Redis 密码
+    restart: always
+    networks:
+      - hyperf-network
+
+# 自定义网络（让所有容器在同一网络，可通过容器名互通）
+networks:
+  hyperf-network:
+    driver: bridge
+    2. Nginx 反向代理配置（hyperf.conf） 创建 /www/hyperf-project/nginx/conf.d/hyperf.conf，内容如下（适配 Hyperf 协程服务）： nginx        server {
+    listen 80;
+    server_name localhost;  # 可替换为你的域名（如 api.xxx.com）
+
+    # 客户端请求体大小限制
+    client_max_body_size 100M;
+
+    # 静态资源直接由 Nginx 处理（如 Hyperf public 目录下的文件）
+    location /public/ {
+        alias /var/www/html/public/;
+        expires 1d;
+    }
+
+    # 所有动态请求转发到 Hyperf 容器（容器名+端口）
+    location / {
+        # Hyperf 默认端口 9501，容器名 hyperf-app 是 docker-compose 里定义的
+        proxy_pass http://hyperf-app:9501;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 适配 Swoole 长连接的配置
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 60s;
+    }
+}
+    3. Hyperf 项目配置修改（关键！） 修改你的 Hyperf 项目中 config/autoload/databases.php（MySQL 配置）和 config/autoload/redis.php（Redis 配置），注意连接地址是容器名（不是 127.0.0.1）： php   运行      // MySQL 配置示例
+return [
+    'default' => [
+        'host'     => 'mysql',  // 容器名 hyperf-mysql，对应 docker-compose 里的 service 名
+        'port'     => 3306,
+        'database' => 'hyperf_db',  // 对应 docker-compose 里的 MYSQL_DATABASE
+        'username' => 'hyperf_user',// 对应 docker-compose 里的 MYSQL_USER
+        'password' => '123456',     // 对应 docker-compose 里的 MYSQL_PASSWORD
+        'charset'  => 'utf8mb4',
+    ],
+];
+
+// Redis 配置示例
+return [
+    'default' => [
+        'host'     => 'redis',  // 容器名 hyperf-redis
+        'port'     => 6379,
+        'auth'     => '123456', // 对应 docker-compose 里的 Redis 密码
+        'db'       => 0,
+    ],
+];
+    三、启动部署（一步到位） 1. 进入项目目录 bash   运行      cd /www/hyperf-project
+    2. 启动所有容器 bash   运行      docker-compose up -d  # -d 表示后台运行
+    3. 验证启动状态 bash   运行      # 查看所有容器状态（Up 表示运行正常）
+docker-compose ps
+
+# 查看 Hyperf 容器日志（排查启动报错）
+docker-compose logs hyperf
+
+# 查看 Nginx 容器日志
+docker-compose logs nginx
+    4. 访问测试 浏览器访问 http://服务器IP（或你的域名），若 Hyperf 项目能正常响应（比如返回接口数据 / 页面），则部署成功。 四、常用运维操作 bash   运行      # 重启所有容器
+docker-compose restart
+
+# 停止所有容器
+docker-compose stop
+
+# 停止并删除所有容器（保留数据）
+docker-compose down
+
+# 进入 Hyperf 容器（安装依赖/调试）
+docker exec -it hyperf-app /bin/sh
+# 比如在容器内安装 Composer 依赖
+composer install --no-dev -o
+
+# 进入 MySQL 容器（执行 SQL）
+docker exec -it hyperf-mysql mysql -u root -p123456
+
+# 查看 Hyperf 进程
+docker exec -it hyperf-app ps aux | grep hyperf
+    五、避坑要点 1. 容器网络互通：docker-compose 中同一网络的容器，可通过 service 名 访问（如 mysql 代替 127.0.0.1），这是最容易踩的坑； 2. 权限问题：Hyperf 项目目录权限需开放（如 chmod -R 755 /www/hyperf-project/hyperf），否则容器内无法读写文件； 3. Composer 依赖：若 Hyperf 项目有 Composer 依赖，需进入容器执行 composer install，否则启动报错； 4. 端口冲突：若服务器已有 Nginx/MySQL/Redis 占用 80/3306/6379 端口，需修改 docker-compose.yml 中的主机端口（如 - "8080:80"）； 5. MySQL 初始化：如需初始化数据库表，可在 mysql/init.sql 中写 SQL 语句，容器启动时会自动执行。  总结 1. Hyperf + Nginx + MySQL + Redis 多服务部署的核心是 docker-compose.yml，通过自定义网络实现容器互通； 2. Nginx 负责反向代理，将动态请求转发到 Hyperf 容器（9501 端口），静态资源由 Nginx 直接处理； 3. 关键配置：Hyperf 连接 MySQL/Redis 时，地址写容器名（mysql/redis），而非 127.0.0.1，同时确保数据目录挂载实现持久化。  如果部署过程中遇到具体报错（比如 Hyperf 启动失败、数据库连接不上），可以告诉我报错信息，我帮你定位解决。

@@ -1,0 +1,96 @@
+# Python asyncio、async 和 await 用法详解
+
+## 1. 概述
+
+`asyncio` 是 Python 3.4+ 版本引入的标准库，用于编写并发代码。`async` 和 `await` 是 Python 3.5+ 中引入的关键字，用于简化异步编程。
+
+## 2. async 关键字
+
+### 2.1 基本概念
+`async` 用于定义协程函数（coroutine function）：
+python async def my_coroutine(): 
+# 异步函数体 
+pass
+
+### 2.2 特点
+- 使用 `async` 定义的函数返回一个协程对象
+- 协程函数不能直接调用执行，需要通过事件循环调度
+- 协程是一种特殊的函数，可以在执行过程中暂停和恢复
+
+## 3. await 关键字
+
+### 3.1 基本概念
+`await` 用于等待异步操作完成：
+python async def fetch_data(): 
+# 模拟异步操作 
+await asyncio.sleep(1) 
+return "data"
+async def main(): 
+result = await fetch_data() 
+# 等待协程完成 
+print(result)
+
+### 3.2 使用规则
+- `await` 只能在 `async` 函数内部使用
+- `await` 会暂停当前协程，直到等待的异步操作完成
+- `await` 后面可以跟协程对象、任务对象或任何awaitable对象
+
+## 4. 基本使用示例
+
+python import asyncio
+async def hello(): 
+print("Hello") 
+await asyncio.sleep(1) 
+# 异步等待1秒 
+print("World")
+运行协程
+asyncio.run(hello())
+
+## 5. 并发执行
+
+### 5.1 使用 asyncio.gather()
+python import asyncio
+async def task1(): await asyncio.sleep(1) return "Task 1 complete"
+async def task2(): await asyncio.sleep(2) return "Task 2 complete"
+async def main(): # 并发执行多个协程 results = await asyncio.gather(task1(), task2()) print(results)
+asyncio.run(main())
+
+### 5.2 使用 asyncio.create_task()
+python async def main(): # 创建任务对象 t1 = asyncio.create_task(task1()) t2 = asyncio.create_task(task2())
+# 等待任务完成
+result1 = await t1
+result2 = await t2
+
+## 6. 实际应用场景
+
+### 6.1 网络请求
+python import asyncio import aiohttp
+async def fetch_url(session, url): async with session.get(url) as response: return await response.text()
+async def main(): async with aiohttp.ClientSession() as session: html = await fetch_url(session, 'http://python.org') print(len(html))
+asyncio.run(main())
+
+### 6.2 文件操作
+python import asyncio import aiofiles
+async def read_file(filename): async with aiofiles.open(filename, mode='r') as f: contents = await f.read() return contents
+async def write_file(filename, content): async with aiofiles.open(filename, mode='w') as f: await f.write(content)
+async def main(): await write_file('test.txt', 'Hello, async world!') content = await read_file('test.txt') print(content)
+asyncio.run(main())
+
+## 7. 错误处理
+python async def might_fail(): await asyncio.sleep(1) raise Exception("Something went wrong")
+async def handle_errors(): try: await might_fail() except Exception as e: print(f"Caught exception: {e}")
+asyncio.run(handle_errors())
+
+## 8. 总结
+
+- `async` 定义协程函数
+- `await` 等待异步操作完成
+- 使用 `asyncio.run()` 运行顶级协程
+- 利用 `asyncio.gather()` 或 `asyncio.create_task()` 实现并发
+- 异步编程适用于 I/O 密集型任务，如网络请求、文件读写等
+
+通过合理使用这些特性，可以显著提高 I/O 密集型应用的性能。
+
+
+
+
